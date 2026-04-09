@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>釜山家族旅遊 🌊</title>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<style>
+       :root { --primary: #0077be; --accent: #ff7043; --bg: #f4f7f9; }
+       body { font-family: -apple-system, sans-serif; background-color: var(--bg); margin: 0; padding-bottom: 50px; }
+       header { background: var(--primary); color: white; text-align: center; padding: 15px; }
+       .controls { text-align: center; padding: 10px; background: white; position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid #ddd; }
+       .container { max-width: 600px; margin: 10px auto; padding: 0 15px; }
+       .day-group { margin-bottom: 30px; }
+       .day-title { font-weight: bold; color: var(--primary); font-size: 1.2rem; margin: 15px 0; padding-left: 10px; border-left: 5px solid var(--primary); }
+       .card { background: white; border-radius: 12px; padding: 15px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); position: relative; border-left: 5px solid var(--accent); }
+       .time-input { color: var(--accent); font-weight: bold; border: none; font-size: 0.9rem; width: 100%; margin-bottom: 5px; }
+       .title-input { font-size: 1.1rem; font-weight: bold; width: 90%; border: none; margin-bottom: 8px; }
+       .note-input { font-size: 0.85rem; color: #666; width: 100%; border: 1px dashed #eee; padding: 6px; border-radius: 6px; background: #fafafa; }
+       .map-link { display: inline-block; margin-top: 10px; color: var(--primary); text-decoration: none; font-size: 0.8rem; font-weight: bold; background: #e0f2f1; padding: 5px 10px; border-radius: 8px; }
+       .btn-save { padding: 12px 25px; background: var(--primary); color: white; border: none; border-radius: 25px; font-weight: bold; }
+</style>
+</head>
+<body>
+<header><h1>釜山家族旅遊 🌊</h1></header>
+<div class="controls">
+<button class="btn-save" onclick="saveData()">💾 儲存修改</button>
+<div id="saveMsg" style="font-size: 0.7rem; color: #4caf50; margin-top: 5px;">若沒看到行程，請嘗試重新整理</div>
+</div>
+<div class="container" id="mainPlanner">
+<p style="text-align: center; color: #999;">行程載入中...</p>
+</div>
+<script>
+   // 原始五天行程
+   const defaultData = [
+       { day: "Day 1 | 05.02 (六) 金海機場 → 海雲台", events: [
+           { time: "15:45 - 19:00", title: "✈️ 桃園 → 金海 (CI186)", note: "起飛 15:45 / 抵達 19:00", map: "" },
+           { time: "20:00 - 21:00", title: "🚗 機場接送 → 住宿", note: "車程約 40-50 分鐘", map: "" },
+           { time: "21:00", title: "🍜 宵夜：密陽豬肉湯飯", note: "24hr 營業", map: "https://www.google.com/maps/search/?api=1&query=Jagalchi%20Market4" }
+       ]},
+       { day: "Day 2 | 05.03 (日) 甘川洞 + 松島 + 南浦", events: [
+           { time: "10:00", title: "🌈 甘川洞文化村", note: "彩色房子散步", map: "https://www.google.com/maps/search/?api=1&query=Jagalchi%20Market5" },
+           { time: "14:10", title: "🚠 松島海上纜車", note: "龍宮雲橋、天空步道", map: "https://www.google.com/maps/search/?api=1&query=Jagalchi%20Market6" },
+           { time: "19:00", title: "🛍️ 南浦洞 / BIFF", note: "李在模 Pizza 晚餐", map: "" }
+       ]},
+       { day: "Day 3 | 05.04 (一) 海雲台 + 機張", events: [
+           { time: "09:30", title: "🚃 天空膠囊列車", note: "尾浦發車", map: "" },
+           { time: "14:10", title: "🏎️ Skyline Luge 滑車", note: "Busan Pass 免費", map: "" },
+           { time: "22:00", title: "♨️ Spa Land 汗蒸幕", note: "新世界百貨", map: "" }
+       ]},
+       { day: "Day 4 | 05.05 (二) 廣安里", events: [
+           { time: "15:00", title: "🎨 Millac the Market", note: "看夕陽逛市集", map: "" },
+           { time: "19:30", title: "🛥️ Yacht Holic 遊艇煙火", note: "50 分鐘", map: "" }
+       ]},
+       { day: "Day 5 | 05.06 (三) 西面 → 回程", events: [
+           { time: "10:00", title: "🛍️ 西面地下街", note: "最後採買", map: "" },
+           { time: "20:00", title: "✈️ 釜山 → 桃園 (CI187)", note: "起飛 20:00", map: "" }
+       ]}
+   ];
+   let itineraryData = defaultData;
+   // 強制嘗試讀取快取
+   try {
+       const saved = localStorage.getItem('busanTripDataFull');
+       if (saved) { itineraryData = JSON.parse(saved); }
+   } catch(e) { console.log("快取讀取失敗"); }
+   const plannerEl = document.getElementById('mainPlanner');
+   function render() {
+       if (!plannerEl) return;
+       plannerEl.innerHTML = '';
+       itineraryData.forEach((day, dIdx) => {
+           const dayBox = document.createElement('div');
+           dayBox.className = 'day-group';
+           dayBox.innerHTML = `<div class="day-title">${day.day}</div><div class="list" id="list-${dIdx}"></div>`;
+           const listEl = dayBox.querySelector('.list');
+           day.events.forEach((ev, eIdx) => {
+               const card = document.createElement('div');
+               card.className = 'card';
+               card.innerHTML = `
+<input class="time-input" value="${ev.time}" onchange="updateData(${dIdx},${eIdx},'time',this.value)">
+<input class="title-input" value="${ev.title}" onchange="updateData(${dIdx},${eIdx},'title',this.value)">
+<textarea class="note-input" onchange="updateData(${dIdx},${eIdx},'note',this.value)">${ev.note}</textarea>
+                   ${ev.map ? `<a href="${ev.map}" target="_blank" class="map-link">📍 開啟導航</a>` : ''}
+               `;
+               listEl.appendChild(card);
+           });
+           plannerEl.appendChild(dayBox);
+           if (typeof Sortable !== 'undefined') {
+               new Sortable(listEl, {
+                   animation: 150,
+                   onEnd: function (evt) {
+                       const items = itineraryData[dIdx].events;
+                       const [moved] = items.splice(evt.oldIndex, 1);
+                       items.splice(evt.newIndex, 0, moved);
+                       saveData();
+                   }
+               });
+           }
+       });
+   }
+   function updateData(d, e, f, v) { itineraryData[d].events[e][f] = v; saveData(); }
+   function saveData() {
+       localStorage.setItem('busanTripDataFull', JSON.stringify(itineraryData));
+       document.getElementById('saveMsg').innerText = "✅ 已儲存 (" + new Date().toLocaleTimeString() + ")";
+   }
+   // 確保頁面加載完成後才執行渲染
+   window.onload = render;
+</script>
+</body>
+</html>
